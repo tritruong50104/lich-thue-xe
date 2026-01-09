@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>CarVibe PRO – Thuê xe Offline</title>
+<style>
+body{margin:0;font-family:-apple-system,system-ui;background:#f3f4f6}
+header{background:#111827;color:#fff;padding:14px;font-size:18px;font-weight:700}
+nav{display:flex;gap:6px;padding:8px;background:#fff;position:sticky;top:0}
+nav button{flex:1;padding:10px;border:0;border-radius:10px;background:#e5e7eb;font-weight:600}
+nav button.active{background:#2563eb;color:#fff}
+.container{padding:10px}
+.card{background:#fff;border-radius:14px;padding:12px;margin-bottom:10px;box-shadow:0 2px 6px rgba(0,0,0,.08)}
+input,select{width:100%;padding:10px;border-radius:10px;border:1px solid #ccc;margin:6px 0}
+button.primary{background:#16a34a;color:#fff;padding:12px;border:0;border-radius:12px;font-weight:700;width:100%}
+button.danger{background:#dc2626;color:#fff;padding:10px;border:0;border-radius:10px;width:100%;margin-top:6px}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<header>🚗 CarVibe PRO</header>
+<nav>
+<button onclick="tab('dash')" id="t-dash" class="active">Tổng quan</button>
+<button onclick="tab('cars')" id="t-cars">Xe</button>
+<button onclick="tab('customers')" id="t-customers">Khách</button>
+<button onclick="tab('rent')" id="t-rent">Thuê</button>
+<button onclick="tab('logs')" id="t-logs">Doanh thu</button>
+</nav>
+<div class="container">
+<div id="dash"><div class="card"><b>Tổng xe:</b> <span id="d-total">0</span><br><b>Khách:</b> <span id="d-customers">0</span><br><b>Doanh thu:</b> <span id="d-money">0</span> đ</div></div>
+<div id="cars" class="hidden"><div class="card"><h3>Thêm xe</h3><input id="c-name" placeholder="Tên xe"><input id="c-plate" placeholder="Biển số"><input id="c-hour" type="number" placeholder="Giá / giờ"><input id="c-day" type="number" placeholder="Giá / ngày"><button class="primary" onclick="addCar()">Thêm xe</button></div><div id="car-list"></div></div>
+<div id="customers" class="hidden"><div class="card"><h3>Thêm khách</h3><input id="u-name" placeholder="Tên khách"><input id="u-phone" placeholder="SĐT"><button class="primary" onclick="addCustomer()">Thêm khách</button></div><div id="customer-list"></div></div>
+<div id="rent" class="hidden"><div class="card"><h3>Tạo đơn thuê</h3><select id="r-car"></select><select id="r-user"></select><input type="datetime-local" id="r-start"><input type="datetime-local" id="r-end"><div><b>Tiền:</b> <span id="r-money">0</span> đ</div><button class="primary" onclick="rentCar()">Thuê xe</button></div></div>
+<div id="logs" class="hidden"><div id="log-list"></div></div>
+</div>
+<script>
+const LS='carvibe_pro_real';
+let db=JSON.parse(localStorage.getItem(LS))||{cars:[],customers:[],logs:[]};
+const save=()=>localStorage.setItem(LS,JSON.stringify(db));
+function tab(t){['dash','cars','customers','rent','logs'].forEach(i=>{document.getElementById(i).classList.add('hidden');document.getElementById('t-'+i).classList.remove('active');});document.getElementById(t).classList.remove('hidden');document.getElementById('t-'+t).classList.add('active');render();}
+function addCar(){if(!c-name.value||!c-plate.value||!c-hour.value||!c-day.value)return;db.cars.push({id:Date.now(),name:c-name.value,plate:c-plate.value,hour:+c-hour.value,day:+c-day.value,rent:null});c-name.value=c-plate.value=c-hour.value=c-day.value='';save();render();}
+function addCustomer(){if(!u-name.value||!u-phone.value)return;db.customers.push({id:Date.now(),name:u-name.value,phone:u-phone.value});u-name.value=u-phone.value='';save();render();}
+function calcMoney(car,s,e){const h=(e-s)/3600000;if(h>=8){return Math.ceil((h/24)*car.day);}return Math.ceil(h*car.hour);}
+function rentCar(){const car=db.cars.find(c=>c.id==r-car.value);const user=db.customers.find(u=>u.id==r-user.value);const s=new Date(r-start.value).getTime();const e=new Date(r-end.value).getTime();if(!car||!user||!s||!e||e<=s)return;const money=calcMoney(car,s,e);car.rent={start:s,end:e,user:user.name,money};save();render();}
+function returnCar(id){const car=db.cars.find(c=>c.id===id);let total=car.rent.money;const now=Date.now();if(now>car.rent.end){total+=Math.ceil(((now-car.rent.end)/3600000)*car.hour*1.5);}db.logs.push({car:car.name,user:car.rent.user,money:total,time:Date.now()});car.rent=null;save();render();}
+function render(){d-total.textContent=db.cars.length;d-customers.textContent=db.customers.length;d-money.textContent=db.logs.reduce((a,b)=>a+b.money,0);car-list.innerHTML='';r-car.innerHTML='<option value="">Chọn xe</option>';db.cars.forEach(c=>{if(!c.rent)r-car.innerHTML+=`<option value="${c.id}">${c.name}</option>`;car-list.innerHTML+=`<div class=card><b>${c.name}</b> (${c.plate})<br>${c.rent?`Đang thuê: ${c.rent.user}<br><b>${c.rent.money} đ</b><button class=danger onclick="returnCar(${c.id})">Trả xe</button>`:'Trống'}</div>`;});customer-list.innerHTML='';r-user.innerHTML='<option value="">Chọn khách</option>';db.customers.forEach(u=>{customer-list.innerHTML+=`<div class=card>${u.name} – ${u.phone}</div>`;r-user.innerHTML+=`<option value="${u.id}">${u.name}</option>`;});log-list.innerHTML='';db.logs.forEach(l=>{log-list.innerHTML+=`<div class=card>${l.car} – ${l.user}<br><b>${l.money} đ</b></div>`;});}
+[r-start,r-end,r-car].forEach(el=>el.onchange=()=>{const car=db.cars.find(c=>c.id==r-car.value);if(!car)return;const s=new Date(r-start.value).getTime();const e=new Date(r-end.value).getTime();if(e>s)r-money.textContent=calcMoney(car,s,e);});
+render();
+</script>
+</body>
+</html>
